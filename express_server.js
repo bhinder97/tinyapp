@@ -7,8 +7,7 @@ app.use(bodyParser.urlencoded({extended: true}));
 app.set("view engine", "ejs");
 
 function generateRandomString() {
-  // return Math.floor((1 + Math.random()) * 0x10000).toString(16).substring(1);
-  return Math.random().toString(36).substring(0, 6);
+  return Math.random().toString(36).substring(2, 8);
 }
 
 const urlDatabase = {
