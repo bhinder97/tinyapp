@@ -27,15 +27,6 @@ const users = {
   }
 }
 
-const checkEmail = function(obj, email) {
-  for (let key in obj) {
-    if (key[email] === email) {
-      return true;
-    } else {
-      return false;
-    }
-  }
-};
 
 function generateRandomString() {
   let newShortURL = Math.random().toString(36).substring(2, 8);
@@ -45,31 +36,39 @@ function generateRandomString() {
   return newShortURL;
 }
 
+const checkEmail = function(obj, email) {
+  for (let key in obj) {
+    if (obj[key].email === email) {
+      return true;
+    }
+  }
+};
+
 app.get("/", (req, res) => {
   res.redirect("/urls");
 });
 
 app.get("/register", (req, res) => {
   res.render("urls_registration");
-})
+});
 
 app.post("/register", (req, res) => {
   let id = generateRandomString();
   let email = req.body.email;
   let password = req.body.password;
+  let foundEmail = checkEmail(users, email);
   if (email === "" || password === "") {
     return res.status(400).send("ERROR: INVALID EMAIL/PASSWORD")
   }
-  let foundEmail = checkEmail(users, email);
   if (foundEmail) {
     return res.status(400).send("ERROR: USER ALREADY EXISTS");
   }
   users[id] = { id, email, password }
   res.cookie("user_id", id)
   const templateVars = { users, id, urls: urlDatabase}
-  console.log("label:", users);
+  // console.log("label:", users);
   res.render("urls_index", templateVars)
-})
+});
 
 app.get("/urls", (req, res) => { 
   const id = req.cookies.user_id
@@ -108,7 +107,6 @@ app.get("/urls/:shortURL/edit", (req, res) => {
 app.post("/urls/:shortURL/edit", (req, res) => {
   let shortURL = req.params.shortURL;
   let longURL = req.body.longURL;
-  console.log(req.body);
   urlDatabase[shortURL] = longURL
   res.redirect(`/urls`)
 })
