@@ -53,23 +53,36 @@ const checkUserID = function(obj, email) {
   }
 };
 
+const checkLogin = function(cookie) {
+  if (cookie) {
+    return true;
+  }
+}
 
 app.get("/", (req, res) => {
   res.redirect("/urls");
 });
 
 app.get("/login", (req, res) => {
-  let id = req.cookies.user_id
+  let id = req.cookies.user_id;
+  let loggedIn = checkLogin(id);
+  if (loggedIn) {
+    return res.redirect("/urls")
+  }
   const templateVars = { user: users[id] }
   res.render("login", templateVars)
 });
 
 app.post("/login", (req, res) => {
   console.log("obj is:", req.body.email)
-  //need to use email to find user ID, have access to users obj and email value
   let email = req.body.email;
   let password = req.body.password;
   let user = checkUserID(users, email);
+  let id = req.cookies.user_id;
+  let loggedIn = checkLogin(id);
+  if (loggedIn) {
+    return res.redirect("/urls")
+  }
   if (!user) {
     return res.status(403).send("ERROR: EMAIL NOT FOUND");
   }
@@ -86,7 +99,11 @@ app.get("/logout", (req, res) => {
 })
 
 app.get("/register", (req, res) => {
-  let id = req.cookies.user_id
+  let id = req.cookies.user_id;
+  let loggedIn = checkLogin(id);
+  if (loggedIn) {
+    return res.redirect("/urls")
+  }
   const templateVars = { user: users[id] }
   res.render("urls_registration", templateVars);
 });
@@ -96,6 +113,11 @@ app.post("/register", (req, res) => {
   let email = req.body.email;
   let password = req.body.password;
   let foundEmail = checkEmail(users, email);
+  let userID = req.cookies.user_id;
+  let loggedIn = checkLogin(userID);
+  if (loggedIn) {
+    return res.redirect("/urls")
+  }
   if (email === "" || password === "") {
     return res.status(400).send("ERROR: INVALID EMAIL/PASSWORD")
   }
@@ -142,6 +164,10 @@ app.post("/urls/:shortURL/edit", (req, res) => {
 
 app.get("/urls/new", (req, res) => {
   const id = req.cookies.user_id
+  let loggedIn = checkLogin(id);
+  if (!loggedIn) {
+    return res.redirect("/login")
+  }
   const templateVars = { user: users[id] };
   res.render("urls_new", templateVars);
 });
