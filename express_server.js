@@ -42,14 +42,53 @@ const checkEmail = function(obj, email) {
       return true;
     }
   }
+  return false;
 };
+
+const checkUserID = function(obj, email) {
+  for (let user of Object.values(obj)) {
+    if (user.email === email) {
+      return user;
+    }
+  }
+};
+
 
 app.get("/", (req, res) => {
   res.redirect("/urls");
 });
 
+app.get("/login", (req, res) => {
+  let id = req.cookies.user_id
+  const templateVars = { user: users[id] }
+  res.render("login", templateVars)
+});
+
+app.post("/login", (req, res) => {
+  console.log("obj is:", req.body.email)
+  //need to use email to find user ID, have access to users obj and email value
+  let email = req.body.email;
+  let password = req.body.password;
+  let user = checkUserID(users, email);
+  if (!user) {
+    return res.status(403).send("ERROR: EMAIL NOT FOUND");
+  }
+  if (user.password !== password) {
+    return res.status(403).send("ERROR: PASSWORD DOES NOT MATCH");
+  }
+  res.cookie('user_id', user.id)
+  res.redirect("/urls");
+});
+
+app.get("/logout", (req, res) => {
+  res.clearCookie('user_id')
+  res.redirect('/urls');
+})
+
 app.get("/register", (req, res) => {
-  res.render("urls_registration");
+  let id = req.cookies.user_id
+  const templateVars = { user: users[id] }
+  res.render("urls_registration", templateVars);
 });
 
 app.post("/register", (req, res) => {
@@ -65,26 +104,16 @@ app.post("/register", (req, res) => {
   }
   users[id] = { id, email, password }
   res.cookie("user_id", id)
-  const templateVars = { users, id, urls: urlDatabase}
+  const templateVars = { user: users[id], urls: urlDatabase}
   // console.log("label:", users);
-  res.render("urls_index", templateVars)
+  res.redirect("/urls")
 });
 
 app.get("/urls", (req, res) => { 
   const id = req.cookies.user_id
-  const templateVars = { users, id, urls: urlDatabase };
+  const templateVars = { user: users[id], urls: urlDatabase };
   res.render("urls_index", templateVars)
 });
-
-app.post("/login", (req, res) => {
-  res.cookie('username', req.body.username)
-  res.redirect("/urls");
-});
-
-app.post("/logout", (req, res) => {
-  res.clearCookie('username')
-  res.redirect('/urls');
-})
 
 app.post("/urls", (req, res) => {
   let shortURL = generateRandomString();
@@ -113,7 +142,7 @@ app.post("/urls/:shortURL/edit", (req, res) => {
 
 app.get("/urls/new", (req, res) => {
   const id = req.cookies.user_id
-  const templateVars = { users, id };
+  const templateVars = { user: users[id] };
   res.render("urls_new", templateVars);
 });
 
@@ -124,7 +153,7 @@ app.get("/u/:shortURL", (req, res) => {
 
 app.get("/urls/:shortURL", (req, res) => {
   const id = req.cookies.user_id
-  const templateVars = { users, shortURL: req.params.shortURL, longURL: urlDatabase[req.params.shortURL], id };
+  const templateVars = { user: users[id], shortURL: req.params.shortURL, longURL: urlDatabase[req.params.shortURL] };
   res.render("urls_show", templateVars);
 });
 
