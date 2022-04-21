@@ -2,11 +2,16 @@ const express = require("express");
 const app = express();
 const PORT = 8080;
 const bodyParser = require("body-parser");
-const cookieParser = require('cookie-parser');
+const cookieSession = require('cookie-session');
 const bcrypt = require("bcryptjs");
+const { getUserByEmail } = require('./helpers')
+
 
 app.use(bodyParser.urlencoded({extended: true}));
-app.use(cookieParser());
+app.use(cookieSession({
+  name: 'session',
+  keys: ['hello']
+}));
 app.set("view engine", "ejs");
 
 const urlDatabase = {
@@ -50,14 +55,6 @@ const checkEmail = function(obj, email) {
   return false;
 };
 
-const checkUserID = function(obj, email) {
-  for (let user of Object.values(obj)) {
-    if (user.email === email) {
-      return user;
-    }
-  }
-};
-
 const checkLogin = function(cookie) {
   if (cookie) {
     return true;
@@ -75,13 +72,14 @@ const checkUrlsForUsers = function(id, urlDatabase) {
   return listOfUrls;
 };
 
-
+// Homepage link that redirects to /urls
 app.get("/", (req, res) => {
   res.redirect("/urls");
 });
 
+//Login form, checks if logged in. If true, redirects to /urls, otherwise shows login form
 app.get("/login", (req, res) => {
-  let id = req.cookies.user_id;
+  let id = req.session.user_id;
   let loggedIn = checkLogin(id);
   if (loggedIn) {
     return res.redirect("/urls")
@@ -90,12 +88,12 @@ app.get("/login", (req, res) => {
   res.render("login", templateVars)
 });
 
+//Uses login info, if logged in redirects to /urls, shows error if email/pass cause error, otherwise logs you in and redirects to /urls
 app.post("/login", (req, res) => {
-  console.log("obj is:", req.body.email)
   let email = req.body.email;
   let password = req.body.password;
-  let user = checkUserID(users, email);
-  let id = req.cookies.user_id;
+  let user = getUserByEmail(email, users);
+  let id = req.session.user_id;
   let loggedIn = checkLogin(id);
   if (loggedIn) {
     return res.redirect("/urls")
@@ -106,18 +104,20 @@ app.post("/login", (req, res) => {
   if (!bcrypt.compareSync(password, user.password)) {
     return res.status(403).send("ERROR: PASSWORD DOES NOT MATCH");
   }
-  res.cookie('user_id', user.id)
+  req.session.user_id = user.id;
   // req.session.user_id = user.id
   res.redirect("/urls");
 });
 
+//deletes cookie when you click logout and redirects to /urls page
 app.get("/logout", (req, res) => {
-  res.clearCookie('user_id')
+  req.session = null;
   res.redirect('/urls');
 });
 
+//register form, if logged in, redirects to /urls. otherwise renders register form
 app.get("/register", (req, res) => {
-  let id = req.cookies.user_id;
+  let id = req.session.user_id;
   let loggedIn = checkLogin(id);
   if (loggedIn) {
     return res.redirect("/urls")
@@ -126,13 +126,14 @@ app.get("/register", (req, res) => {
   res.render("urls_registration", templateVars);
 });
 
+//if loggedin, auto redirects to /urls. if uses exists or email/pass are empty, sends out error msgs. if new user, registers email and redirects to /urls
 app.post("/register", (req, res) => {
   let id = generateRandomString();
   let email = req.body.email;
   let password = req.body.password;
   let hashedPassword = bcrypt.hashSync(password, 10);
   let foundEmail = checkEmail(users, email);
-  let userID = req.cookies.user_id;
+  let userID = req.session.user_id;
   let loggedIn = checkLogin(userID);
   if (loggedIn) {
     return res.redirect("/urls")
@@ -144,41 +145,42 @@ app.post("/register", (req, res) => {
     return res.status(400).send("ERROR: USER ALREADY EXISTS");
   }
   users[id] = { id, email, password: hashedPassword }
-  res.cookie("user_id", id)
+  req.session.user_id = id;
   const templateVars = { user: users[id], urls: urlDatabase}
   res.redirect("/urls")
 });
 
+//get request to /urls_index template, if not logged in then redirects to login
 app.get("/urls", (req, res) => { 
-  const id = req.cookies.user_id
+  const id = req.session.user_id
   let loggedIn = checkLogin(id);
   if (!loggedIn) {
-    return res.redirect("/register");
+    return res.status(401).redirect("/login");
   }
   const getUrls = checkUrlsForUsers(id, urlDatabase);
   const templateVars = { user: users[id], urls: getUrls };
   res.render("urls_index", templateVars)
 });
 
+//post request to /urls, if not logged in then redirects to login. otherwise 
 app.post("/urls", (req, res) => {
   let shortURL = generateRandomString();
   let longURL = req.body.longURL;
-  const id = req.cookies.user_id;
-  console.log("id is:", id);
+  const id = req.session.user_id;
   let loggedIn = checkLogin(id);
   if (!loggedIn) {
-    return res.redirect("/login");
+    return res.status(401).redirect("/login");
   }
   urlDatabase[shortURL] = { 
     longURL: longURL,
-    userID: req.cookies.user_id 
+    userID: req.session.user_id 
   }
   console.log("urls:", urlDatabase)
   res.redirect(`/urls/${shortURL}`)
 });
 
 app.post("/urls/:shortURL/delete", (req, res) => {
-  const id = req.cookies.user_id;
+  const id = req.session.user_id;
   let loggedIn = checkLogin(id);
   if (!loggedIn) {
     return res.redirect("/login")
@@ -205,7 +207,7 @@ app.post("/urls/:shortURL/edit", (req, res) => {
 });
 
 app.get("/urls/new", (req, res) => {
-  const id = req.cookies.user_id
+  const id = req.session.user_id
   let loggedIn = checkLogin(id);
   if (!loggedIn) {
     return res.redirect("/login")
@@ -220,7 +222,7 @@ app.get("/u/:shortURL", (req, res) => {
 });
 
 app.get("/urls/:shortURL", (req, res) => {
-  const id = req.cookies.user_id
+  const id = req.session.user_id
   const templateVars = { user: users[id], shortURL: req.params.shortURL, longURL: urlDatabase[req.params.shortURL] };
   res.render("urls_show", templateVars);
 });
