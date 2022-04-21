@@ -3,15 +3,11 @@ const app = express();
 const PORT = 8080;
 const bodyParser = require("body-parser");
 const cookieParser = require('cookie-parser');
+const bcrypt = require("bcryptjs");
 
 app.use(bodyParser.urlencoded({extended: true}));
-app.use(cookieParser())
+app.use(cookieParser());
 app.set("view engine", "ejs");
-
-// let urlDatabase = {
-//   "b2xVn2": "http://www.lighthouselabs.ca",
-//   "9sm5xK": "http://www.google.com",
-// };
 
 const urlDatabase = {
   b6UTxQ: {
@@ -37,14 +33,13 @@ const users = {
   }
 };
 
-
 function generateRandomString() {
   let newShortURL = Math.random().toString(36).substring(2, 8);
   if (urlDatabase[newShortURL]) {
     return Math.random().toString(36).substring(2, 8);
   }
   return newShortURL;
-}
+};
 
 const checkEmail = function(obj, email) {
   for (let key in obj) {
@@ -108,7 +103,7 @@ app.post("/login", (req, res) => {
   if (!user) {
     return res.status(403).send("ERROR: EMAIL NOT FOUND");
   }
-  if (user.password !== password) {
+  if (!bcrypt.compareSync(password, user.password)) {
     return res.status(403).send("ERROR: PASSWORD DOES NOT MATCH");
   }
   res.cookie('user_id', user.id)
@@ -119,7 +114,7 @@ app.post("/login", (req, res) => {
 app.get("/logout", (req, res) => {
   res.clearCookie('user_id')
   res.redirect('/urls');
-})
+});
 
 app.get("/register", (req, res) => {
   let id = req.cookies.user_id;
@@ -135,6 +130,7 @@ app.post("/register", (req, res) => {
   let id = generateRandomString();
   let email = req.body.email;
   let password = req.body.password;
+  let hashedPassword = bcrypt.hashSync(password, 10);
   let foundEmail = checkEmail(users, email);
   let userID = req.cookies.user_id;
   let loggedIn = checkLogin(userID);
@@ -147,7 +143,7 @@ app.post("/register", (req, res) => {
   if (foundEmail) {
     return res.status(400).send("ERROR: USER ALREADY EXISTS");
   }
-  users[id] = { id, email, password }
+  users[id] = { id, email, password: hashedPassword }
   res.cookie("user_id", id)
   const templateVars = { user: users[id], urls: urlDatabase}
   res.redirect("/urls")
@@ -206,7 +202,7 @@ app.post("/urls/:shortURL/edit", (req, res) => {
   let longURL = req.body.longURL;
   urlDatabase[shortURL].longURL = longURL
   res.redirect(`/urls`)
-})
+});
 
 app.get("/urls/new", (req, res) => {
   const id = req.cookies.user_id
