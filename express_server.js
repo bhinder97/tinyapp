@@ -64,7 +64,6 @@ const checkLogin = function(cookie) {
 const checkUrlsForUsers = function(id, urlDatabase) {
   let listOfUrls = {};
   for (let key in urlDatabase) {
-    // console.log("key is:", key);
     if (id === urlDatabase[key].userID) {
       listOfUrls[key] = urlDatabase[key];
     }
@@ -74,6 +73,11 @@ const checkUrlsForUsers = function(id, urlDatabase) {
 
 // Homepage link that redirects to /urls
 app.get("/", (req, res) => {
+  let id = req.session.user_id;
+  let loggedIn = checkLogin(id);
+  if (!loggedIn) {
+    return res.status(401).redirect("/login");
+  }
   res.redirect("/urls");
 });
 
@@ -99,10 +103,12 @@ app.post("/login", (req, res) => {
     return res.redirect("/urls")
   }
   if (!user) {
-    return res.status(403).send("ERROR: EMAIL NOT FOUND");
+    const templateVars = { user: undefined, message: "Email not found!" };
+    return res.render("error", templateVars);
   }
   if (!bcrypt.compareSync(password, user.password)) {
-    return res.status(403).send("ERROR: PASSWORD DOES NOT MATCH");
+    const templateVars = { user: undefined, message: "Password does not match!" };
+    return res.render("error", templateVars);
   }
   req.session.user_id = user.id;
   // req.session.user_id = user.id
@@ -139,10 +145,12 @@ app.post("/register", (req, res) => {
     return res.redirect("/urls")
   }
   if (email === "" || password === "") {
-    return res.status(400).send("ERROR: INVALID EMAIL/PASSWORD")
+    const templateVars = { user: undefined, message: "Invalid email/password!" };
+    return res.render("error", templateVars);
   }
   if (foundEmail) {
-    return res.status(400).send("ERROR: USER ALREADY EXISTS");
+    const templateVars = { user: undefined, message: "User already exists!" };
+    return res.render("error", templateVars);
   }
   users[id] = { id, email, password: hashedPassword }
   req.session.user_id = id;
@@ -155,7 +163,8 @@ app.get("/urls", (req, res) => {
   const id = req.session.user_id
   let loggedIn = checkLogin(id);
   if (!loggedIn) {
-    return res.status(401).redirect("/login");
+    const templateVars = { user: undefined, message: "User not logged in!" };
+    return res.render("error", templateVars);
   }
   const getUrls = checkUrlsForUsers(id, urlDatabase);
   const templateVars = { user: users[id], urls: getUrls };
@@ -169,7 +178,8 @@ app.post("/urls", (req, res) => {
   const id = req.session.user_id;
   let loggedIn = checkLogin(id);
   if (!loggedIn) {
-    return res.status(401).redirect("/login");
+    const templateVars = { user: undefined, message: "User not logged in!" };
+    return res.render("error", templateVars);
   }
   urlDatabase[shortURL] = { 
     longURL: longURL,
@@ -201,7 +211,27 @@ app.get("/urls/:shortURL/edit", (req, res) => {
 
 app.post("/urls/:shortURL/edit", (req, res) => {
   let shortURL = req.params.shortURL;
+  const id = req.session.user_id
+  let loggedIn = checkLogin(id);
+  if (!loggedIn) {
+    const templateVars = { user: undefined, message: "User not logged in!" };
+    return res.render("error", templateVars);
+  }
   let longURL = req.body.longURL;
+  urlDatabase[shortURL].longURL = longURL;
+  res.redirect(`/urls`)
+});
+
+app.post("/urls/:shortURL", (req, res) => {
+  let shortURL = req.params.shortURL;
+  let longURL = req.body.longURL;
+  const id = req.session.user_id
+  let loggedIn = checkLogin(id);
+  if (!loggedIn) {
+    const templateVars = { user: undefined, message: "User not logged in!" };
+    return res.render("error", templateVars);
+  }
+  
   urlDatabase[shortURL].longURL = longURL
   res.redirect(`/urls`)
 });
@@ -217,13 +247,32 @@ app.get("/urls/new", (req, res) => {
 });
 
 app.get("/u/:shortURL", (req, res) => {
-  let longURL = urlDatabase[req.params.shortURL].longURL;
-  res.redirect(longURL);
+  let longURL = urlDatabase[req.params.shortURL];
+  if (!longURL) {
+    const templateVars = { user: undefined, message: "URL does not exist" };
+    return res.render("error", templateVars)
+  }
+  res.redirect(longURL.longURL);
 });
 
 app.get("/urls/:shortURL", (req, res) => {
   const id = req.session.user_id
-  const templateVars = { user: users[id], shortURL: req.params.shortURL, longURL: urlDatabase[req.params.shortURL] };
+  let templateVars = { user: users[id], shortURL: req.params.shortURL, longURL: urlDatabase[req.params.shortURL] }
+  let loggedIn = checkLogin(id);
+  if (!loggedIn) {
+    templateVars = { user: undefined, message: "User not logged in!" };
+    return res.render("error", templateVars);
+  }
+  
+  if (urlDatabase[req.params.shortURL] && urlDatabase[req.params.shortURL].userID !== id) {
+    templateVars = { user: undefined, message: "User not authorized!" };
+    return res.render("error", templateVars);
+  }
+
+  if (!urlDatabase[req.params.shortURL]) {
+    templateVars['message'] = "URL does not exist";
+    return res.render("error", templateVars)
+  }
   res.render("urls_show", templateVars);
 });
 
