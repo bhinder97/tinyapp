@@ -18,7 +18,7 @@ TinyApp is a full stack web application built with Node and Express that allows 
 - bcrypt
 - body-parser
 - cookie-session
-
+- cookie-parser is an unneeded install, therefore you can skip that
 
 ## Getting Started
 
