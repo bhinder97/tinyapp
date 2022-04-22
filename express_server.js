@@ -224,7 +224,7 @@ app.post("/urls/:shortURL/edit", (req, res) => {
   res.redirect(`/urls`);
 });
 
-// 
+// get request to the edit page
 app.post("/urls/:shortURL", (req, res) => {
   let shortURL = req.params.shortURL;
   let longURL = req.body.longURL;
@@ -250,7 +250,7 @@ app.get("/urls/new", (req, res) => {
   res.render("urls_new", templateVars);
 });
 
-//
+//if the url does not exist then redirects to an error page, otherwise it will redirect to the webpage of the shortened link
 app.get("/u/:shortURL", (req, res) => {
   let longURL = urlDatabase[req.params.shortURL];
   if (!longURL) {
@@ -260,6 +260,7 @@ app.get("/u/:shortURL", (req, res) => {
   res.redirect(longURL.longURL);
 });
 
+//different get requests for the shortURLs depending on the conditions below
 app.get("/urls/:shortURL", (req, res) => {
   const id = req.session.user_id;
   let templateVars = { user: users[id], shortURL: req.params.shortURL, longURL: urlDatabase[req.params.shortURL] };
