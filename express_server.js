@@ -4,7 +4,7 @@ const PORT = 8080;
 const bodyParser = require("body-parser");
 const cookieSession = require('cookie-session');
 const bcrypt = require("bcryptjs");
-const { getUserByEmail } = require('./helpers')
+const { getUserByEmail } = require('./helpers');
 
 
 app.use(bodyParser.urlencoded({extended: true}));
@@ -16,13 +16,13 @@ app.set("view engine", "ejs");
 
 const urlDatabase = {
   b6UTxQ: {
-        longURL: "https://www.tsn.ca",
-        userID: "aJ48lW"
-    },
-    i3BoGr: {
-        longURL: "https://www.google.ca",
-        userID: "aJ48lW"
-    }
+    longURL: "https://www.tsn.ca",
+    userID: "aJ48lW"
+  },
+  i3BoGr: {
+    longURL: "https://www.google.ca",
+    userID: "aJ48lW"
+  }
 };
 
 const users = {
@@ -38,7 +38,7 @@ const users = {
   }
 };
 
-function generateRandomString() {
+const generateRandomString = function() {
   let newShortURL = Math.random().toString(36).substring(2, 8);
   if (urlDatabase[newShortURL]) {
     return Math.random().toString(36).substring(2, 8);
@@ -85,11 +85,12 @@ app.get("/", (req, res) => {
 app.get("/login", (req, res) => {
   let id = req.session.user_id;
   let loggedIn = checkLogin(id);
-  if (loggedIn) {
-    return res.redirect("/urls")
+  if (id) {
+    res.redirect("/urls");
+    return;
   }
-  const templateVars = { user: users[id] }
-  res.render("login", templateVars)
+  const templateVars = { user: users[id] };
+  res.render("login", templateVars);
 });
 
 //Uses login info, if logged in redirects to /urls, shows error if email/pass cause error, otherwise logs you in and redirects to /urls
@@ -100,7 +101,7 @@ app.post("/login", (req, res) => {
   let id = req.session.user_id;
   let loggedIn = checkLogin(id);
   if (loggedIn) {
-    return res.redirect("/urls")
+    return res.redirect("/urls");
   }
   if (!user) {
     const templateVars = { user: undefined, message: "Email not found!" };
@@ -111,7 +112,6 @@ app.post("/login", (req, res) => {
     return res.render("error", templateVars);
   }
   req.session.user_id = user.id;
-  // req.session.user_id = user.id
   res.redirect("/urls");
 });
 
@@ -126,9 +126,9 @@ app.get("/register", (req, res) => {
   let id = req.session.user_id;
   let loggedIn = checkLogin(id);
   if (loggedIn) {
-    return res.redirect("/urls")
+    return res.redirect("/urls");
   }
-  const templateVars = { user: users[id] }
+  const templateVars = { user: users[id] };
   res.render("urls_registration", templateVars);
 });
 
@@ -142,7 +142,7 @@ app.post("/register", (req, res) => {
   let userID = req.session.user_id;
   let loggedIn = checkLogin(userID);
   if (loggedIn) {
-    return res.redirect("/urls")
+    return res.redirect("/urls");
   }
   if (email === "" || password === "") {
     const templateVars = { user: undefined, message: "Invalid email/password!" };
@@ -152,26 +152,24 @@ app.post("/register", (req, res) => {
     const templateVars = { user: undefined, message: "User already exists!" };
     return res.render("error", templateVars);
   }
-  users[id] = { id, email, password: hashedPassword }
+  users[id] = { id, email, password: hashedPassword };
   req.session.user_id = id;
-  const templateVars = { user: users[id], urls: urlDatabase}
-  res.redirect("/urls")
+  res.redirect("/urls");
 });
 
 //get request to /urls_index template, if not logged in then redirects to login
-app.get("/urls", (req, res) => { 
-  const id = req.session.user_id
-  let loggedIn = checkLogin(id);
-  if (!loggedIn) {
+app.get("/urls", (req, res) => {
+  let id = req.session.user_id;
+  if (!id) {
     const templateVars = { user: undefined, message: "User not logged in!" };
     return res.render("error", templateVars);
   }
   const getUrls = checkUrlsForUsers(id, urlDatabase);
   const templateVars = { user: users[id], urls: getUrls };
-  res.render("urls_index", templateVars)
+  res.render("urls_index", templateVars);
 });
 
-//post request to /urls, if not logged in then redirects to login. otherwise 
+//post request to /urls, if not logged in then redirects to login. otherwise
 app.post("/urls", (req, res) => {
   let shortURL = generateRandomString();
   let longURL = req.body.longURL;
@@ -181,37 +179,41 @@ app.post("/urls", (req, res) => {
     const templateVars = { user: undefined, message: "User not logged in!" };
     return res.render("error", templateVars);
   }
-  urlDatabase[shortURL] = { 
+  urlDatabase[shortURL] = {
     longURL: longURL,
-    userID: req.session.user_id 
-  }
-  console.log("urls:", urlDatabase)
-  res.redirect(`/urls/${shortURL}`)
+    userID: req.session.user_id
+  };
+  res.redirect(`/urls/${shortURL}`);
 });
 
+//post request, if not logged in, redirects back to /login. otherwise it deletes the shortURL that we created earlier
 app.post("/urls/:shortURL/delete", (req, res) => {
+  let id = req.session.user_id;
+  let loggedIn = checkLogin(id);
+  if (loggedIn && id === urlDatabase[shortURL].userID) {
+    let shortURL = req.params.shortURL;
+    delete urlDatabase[shortURL];
+    res.redirect("/urls");
+    return;
+  }
+  return res.redirect("/login");
+});
+
+//makes a get request when you click the edit button, takes you to the edit page. if not logged in then redirects you to login
+app.get("/urls/:shortURL/edit", (req, res) => {
   const id = req.session.user_id;
   let loggedIn = checkLogin(id);
   if (!loggedIn) {
-    return res.redirect("/login")
+    return res.redirect("/login");
   }
   let shortURL = req.params.shortURL;
-  delete urlDatabase[shortURL];
-  res.redirect("/urls");
+  res.redirect(`/urls_show/${shortURL}`);
 });
 
-app.get("/urls/:shortURL/edit", (req, res) => {
-  let loggedIn = checkLogin(id);
-  if (!loggedIn) {
-    return res.redirect("/login")
-  }
-  let shortURL = req.params.shortURL;
-  res.redirect(`/urls_show/${shortURL}`)
-});
-
+//post request to the edit page, if not logged in then sends an error msg. otherwise lets you edit and update your URL
 app.post("/urls/:shortURL/edit", (req, res) => {
   let shortURL = req.params.shortURL;
-  const id = req.session.user_id
+  const id = req.session.user_id;
   let loggedIn = checkLogin(id);
   if (!loggedIn) {
     const templateVars = { user: undefined, message: "User not logged in!" };
@@ -219,45 +221,48 @@ app.post("/urls/:shortURL/edit", (req, res) => {
   }
   let longURL = req.body.longURL;
   urlDatabase[shortURL].longURL = longURL;
-  res.redirect(`/urls`)
+  res.redirect(`/urls`);
 });
 
+// 
 app.post("/urls/:shortURL", (req, res) => {
   let shortURL = req.params.shortURL;
   let longURL = req.body.longURL;
-  const id = req.session.user_id
+  const id = req.session.user_id;
   let loggedIn = checkLogin(id);
   if (!loggedIn) {
     const templateVars = { user: undefined, message: "User not logged in!" };
     return res.render("error", templateVars);
   }
   
-  urlDatabase[shortURL].longURL = longURL
-  res.redirect(`/urls`)
+  urlDatabase[shortURL].longURL = longURL;
+  res.redirect(`/urls`);
 });
 
+// get request, if not logged in, then redirects user to log in. otherwise renders the new urls page
 app.get("/urls/new", (req, res) => {
-  const id = req.session.user_id
+  const id = req.session.user_id;
   let loggedIn = checkLogin(id);
   if (!loggedIn) {
-    return res.redirect("/login")
+    return res.redirect("/login");
   }
   const templateVars = { user: users[id] };
   res.render("urls_new", templateVars);
 });
 
+//
 app.get("/u/:shortURL", (req, res) => {
   let longURL = urlDatabase[req.params.shortURL];
   if (!longURL) {
     const templateVars = { user: undefined, message: "URL does not exist" };
-    return res.render("error", templateVars)
+    return res.render("error", templateVars);
   }
   res.redirect(longURL.longURL);
 });
 
 app.get("/urls/:shortURL", (req, res) => {
-  const id = req.session.user_id
-  let templateVars = { user: users[id], shortURL: req.params.shortURL, longURL: urlDatabase[req.params.shortURL] }
+  const id = req.session.user_id;
+  let templateVars = { user: users[id], shortURL: req.params.shortURL, longURL: urlDatabase[req.params.shortURL] };
   let loggedIn = checkLogin(id);
   if (!loggedIn) {
     templateVars = { user: undefined, message: "User not logged in!" };
@@ -271,17 +276,13 @@ app.get("/urls/:shortURL", (req, res) => {
 
   if (!urlDatabase[req.params.shortURL]) {
     templateVars['message'] = "URL does not exist";
-    return res.render("error", templateVars)
+    return res.render("error", templateVars);
   }
   res.render("urls_show", templateVars);
 });
 
 app.get("/urls.json", (req, res) => {
   res.json(urlDatabase);
-});
-
-app.get("/hello", (req, res) => {
-  res.send("<html><body>Hello <b>World</b></body></html>\n");
 });
 
 app.listen(PORT, () => {
