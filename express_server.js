@@ -190,7 +190,7 @@ app.post("/urls", (req, res) => {
 app.post("/urls/:shortURL/delete", (req, res) => {
   let id = req.session.user_id;
   let loggedIn = checkLogin(id);
-  if (loggedIn && id === urlDatabase[shortURL].userID) {
+  if (loggedIn) {
     let shortURL = req.params.shortURL;
     delete urlDatabase[shortURL];
     res.redirect("/urls");
